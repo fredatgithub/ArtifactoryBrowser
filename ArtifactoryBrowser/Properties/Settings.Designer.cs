@@ -94,5 +94,17 @@ namespace ArtifactoryBrowser.Properties {
                 this["WindowState"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LastUrl {
+            get {
+                return ((string)(this["LastUrl"]));
+            }
+            set {
+                this["LastUrl"] = value;
+            }
+        }
     }
 }

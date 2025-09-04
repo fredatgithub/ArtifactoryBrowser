@@ -4,9 +4,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ArtifactoryBrowser"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
         Title="Artifactory Browser" 
-        MinWidth="800" MinHeight="600"
+        MinWidth="1000" MinHeight="700"
         WindowStartupLocation="Manual"
         FontSize="14"
         Closing="Window_Closing">
@@ -23,22 +24,7 @@
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="MinWidth" Value="100"/>
-        </Style>
-        <Style TargetType="DataGrid">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="AutoGenerateColumns" Value="False"/>
-            <Setter Property="IsReadOnly" Value="True"/>
-            <Setter Property="CanUserAddRows" Value="False"/>
-            <Setter Property="CanUserDeleteRows" Value="False"/>
-            <Setter Property="SelectionMode" Value="Single"/>
-            <Setter Property="RowHeight" Value="30"/>
-            <Setter Property="ColumnHeaderHeight" Value="35"/>
-        </Style>
-        <Style TargetType="DataGridColumnHeader">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Margin" Value="5,0"/>
         </Style>
     </Window.Resources>
     
@@ -47,53 +33,43 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="10"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="10"/>
-            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         
-        <!-- URL Input -->
+        <!-- Barre de navigation -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Artifactory URL:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <TextBox x:Name="txtArtifactoryUrl" Grid.Column="1" Margin="0,0,10,0" 
-                     KeyDown="TxtArtifactoryUrl_KeyDown"/>
-            <Button x:Name="btnSearch" Grid.Column="2" Content="Rechercher" 
-                    Click="BtnSearch_Click"/>
+            
+            <Button x:Name="btnBack" Grid.Column="0" Content="←" Click="BtnBack_Click" ToolTip="Page précédente"/>
+            <Button x:Name="btnForward" Grid.Column="0" Content="→" Click="BtnForward_Click" Margin="40,0,0,0" ToolTip="Page suivante"/>
+            
+            <TextBox x:Name="txtArtifactoryUrl" Grid.Column="1" Margin="10,0,10,0" 
+                     KeyDown="TxtArtifactoryUrl_KeyDown" VerticalContentAlignment="Center"/>
+            
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="btnGo" Content="Aller" Click="BtnGo_Click" Width="80"/>
+                <Button x:Name="btnRefresh" Content="🔄" Click="BtnRefresh_Click" Width="40" ToolTip="Rafraîchir"/>
+            </StackPanel>
         </Grid>
 
-        <!-- Environnement DEV -->
-        <GroupBox Grid.Row="2" Header="Environnement DEV" FontSize="16">
-            <DataGrid x:Name="dgvDev">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Nom du fichier" Binding="{Binding Name}" Width="*"/>
-                    <DataGridTextColumn Header="Taille (Mo)" Binding="{Binding Size, StringFormat=N2}" Width="120"/>
-                    <DataGridTextColumn Header="Dernière modification" Binding="{Binding LastModified}" Width="200"/>
-                    <DataGridTextColumn Header="Chemin" Binding="{Binding Path}" Width="*"/>
-                </DataGrid.Columns>
-            </DataGrid>
-        </GroupBox>
+        <!-- WebView2 -->
+    <wv2:WebView2 x:Name="webView" Grid.Row="2" 
+             Source="https://www.jfrog.com/artifactory/"
+             NavigationStarting="WebView_NavigationStarting"
+             NavigationCompleted="WebView_NavigationCompleted"
+             Margin="0,10,0,0"/>
 
-        <!-- Environnement PROD -->
-        <GroupBox Grid.Row="4" Header="Environnement PROD" FontSize="16">
-            <DataGrid x:Name="dgvProd">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Nom du fichier" Binding="{Binding Name}" Width="*"/>
-                    <DataGridTextColumn Header="Taille (Mo)" Binding="{Binding Size, StringFormat=N2}" Width="120"/>
-                    <DataGridTextColumn Header="Dernière modification" Binding="{Binding LastModified}" Width="200"/>
-                    <DataGridTextColumn Header="Chemin" Binding="{Binding Path}" Width="*"/>
-                </DataGrid.Columns>
-            </DataGrid>
-        </GroupBox>
-        
-        <TextBlock x:Name="lblStatus" Grid.Row="4" Margin="0,5,0,0" 
-                   Text="Entrez une URL Artifactory et cliquez sur Rechercher" 
-                   VerticalAlignment="Center" 
-                   HorizontalAlignment="Center"
-                   TextAlignment="Center"
-                   Foreground="Gray"/>
+    <!-- Barre d'état -->
+        <StatusBar Grid.Row="3" VerticalAlignment="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="lblStatus">Prêt</TextBlock>
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="lblProgress"></TextBlock>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>

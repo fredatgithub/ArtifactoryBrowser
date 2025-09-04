@@ -1,188 +1,168 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using ArtifactoryBrowser.Models;
-using Newtonsoft.Json;
+using Microsoft.Web.WebView2.Core;
 
 namespace ArtifactoryBrowser
 {
   public partial class MainWindow: Window
   {
-    private readonly HttpClient _httpClient;
+    private bool _isNavigating = false;
+    private string _userDataFolder;
 
     public MainWindow()
     {
       InitializeComponent();
-      _httpClient = new HttpClient();
+      Loaded += MainWindow_Loaded;
+      _userDataFolder = Path.Combine(
+          Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+          "ArtifactoryBrowser",
+          "WebView2"
+      );
+      InitializeAsync();
+      
+    }
 
-      // Restaurer l'URL sauvegardée
-      txtArtifactoryUrl.Text = Properties.Settings.Default.ArtifactoryUrl ?? string.Empty;
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+      await InitializeWebView();
+    }
 
-      // Restaurer la taille et la position de la fenêtre
-      Left = Properties.Settings.Default.WindowLeft;
-      Top = Properties.Settings.Default.WindowTop;
-      Width = Properties.Settings.Default.WindowWidth;
-      Height = Properties.Settings.Default.WindowHeight;
-      WindowState = Properties.Settings.Default.WindowState;
-
-      // S'assurer que la fenêtre est visible sur l'écran
-      if (Left < 0 || Top < 0 || Left > SystemParameters.VirtualScreenWidth || Top > SystemParameters.VirtualScreenHeight)
+    private async void InitializeAsync()
+    {
+      try
       {
-        Left = 100;
-        Top = 100;
+        // Configurez le dossier de données utilisateur pour WebView2
+        var webView2Environment = await CoreWebView2Environment.CreateAsync(
+            userDataFolder: _userDataFolder
+        );
+
+        await webView.EnsureCoreWebView2Async(webView2Environment);
+
+        // Chargez l'URL sauvegardée ou l'URL par défaut
+        if (!string.IsNullOrEmpty(Properties.Settings.Default.LastUrl))
+        {
+          webView.Source = new Uri(Properties.Settings.Default.LastUrl);
+          txtArtifactoryUrl.Text = Properties.Settings.Default.LastUrl;
+        }
+        else
+        {
+          webView.Source = new Uri("https://www.jfrog.com/artifactory/");
+        }
+      }
+      catch (Exception ex)
+      {
+        MessageBox.Show($"Erreur lors de l'initialisation de WebView2 : {ex.Message}",
+            "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
       }
     }
 
-    private async void BtnSearch_Click(object sender, RoutedEventArgs e)
+    private void WebView_NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
     {
-      await SearchArtifactoryFiles();
+      _isNavigating = true;
+      UpdateUI();
+      lblStatus.Text = "Chargement...";
+    }
+
+    private void WebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+      _isNavigating = false;
+      UpdateUI();
+      lblStatus.Text = "Prêt";
+
+      // Mettre à jour l'URL dans la barre d'adresse
+      txtArtifactoryUrl.Text = webView.Source?.ToString() ?? "";
+
+      // Sauvegarder l'URL
+      if (!string.IsNullOrEmpty(webView.Source?.ToString()))
+      {
+        Properties.Settings.Default.LastUrl = webView.Source.ToString();
+        Properties.Settings.Default.Save();
+      }
+    }
+
+    private void WebView_CoreWebView2Initialized(object sender, CoreWebView2InitializedEventArgs e)
+    {
+      // Configuration supplémentaire de WebView2
+      if (webView.CoreWebView2 != null)
+      {
+        // Activer les outils de développement (F12)
+        webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
+        webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+      }
+    }
+
+    private async void BtnGo_Click(object sender, RoutedEventArgs e)
+    {
+      await NavigateToUrl(txtArtifactoryUrl.Text.Trim());
     }
 
     private async void TxtArtifactoryUrl_KeyDown(object sender, KeyEventArgs e)
     {
       if (e.Key == Key.Enter)
       {
-        await SearchArtifactoryFiles();
+        await NavigateToUrl(txtArtifactoryUrl.Text.Trim());
       }
     }
 
-    private async Task SearchArtifactoryFiles()
+    private async Task NavigateToUrl(string url)
     {
-      string baseUrl = txtArtifactoryUrl.Text.Trim();
-
-      if (string.IsNullOrEmpty(baseUrl))
-      {
-        MessageBox.Show("Veuillez entrer une URL Artifactory valide.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-        return;
-      }
-
       try
       {
-        btnSearch.IsEnabled = false;
-        lblStatus.Text = "Recherche en cours...";
-
-        // Nettoyer l'URL
-        if (!baseUrl.EndsWith("/"))
+        if (string.IsNullOrWhiteSpace(url))
         {
-          baseUrl += "/";
+          return;
         }
 
-        // Créer les URLs pour les environnements
-        string devUrl = new Uri(baseUrl).ToString();
-        string prodUrl = devUrl.Replace("dev", "prod").ToString();
-
-        // Récupérer les fichiers en parallèle
-        var devTask = GetArtifactoryFilesAsync(devUrl, "DEV");
-        var prodTask = GetArtifactoryFilesAsync(prodUrl, "PROD");
-
-        await Task.WhenAll(devTask, prodTask);
-
-        // Mettre à jour les DataGrid
-        dgvDev.ItemsSource = devTask.Result;
-        dgvProd.ItemsSource = prodTask.Result;
-
-        lblStatus.Text = $"Terminé. {devTask.Result.Count} fichiers DEV, {prodTask.Result.Count} fichiers PROD trouvés.";
-      }
-      catch (Exception exception)
-      {
-        MessageBox.Show($"Une erreur est survenue : {exception.Message}", "Erreur",
-            MessageBoxButton.OK, MessageBoxImage.Error);
-        lblStatus.Text = "Erreur lors de la recherche.";
-      }
-      finally
-      {
-        btnSearch.IsEnabled = true;
-      }
-    }
-
-    private async Task<List<ArtifactoryFile>> GetArtifactoryFilesAsync(string baseUrl, string environment)
-    {
-      var files = new List<ArtifactoryFile>();
-
-      try
-      {
-        // Construire l'URL de l'API Artifactory
-        string apiUrl = $"{baseUrl}api/storage/{Uri.EscapeDataString(baseUrl)}";
-
-        // Ajouter le header pour accepter JSON
-        _httpClient.DefaultRequestHeaders.Accept.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-        // Effectuer la requête
-        var response = await _httpClient.GetAsync(apiUrl);
-        response.EnsureSuccessStatusCode();
-
-        // Désérialiser la réponse
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonConvert.DeserializeObject<ArtifactoryResponse>(content);
-
-        // Filtrer et formater les fichiers
-        if (result?.Children != null)
+        // Ajouter le protocole si manquant
+        if (!url.StartsWith("http://") && !url.StartsWith("https://"))
         {
-          foreach (var child in result.Children)
-          {
-            if (child.Folder == null || !child.Folder.Value)
-            {
-              var fileInfo = await GetFileInfoAsync($"{baseUrl.TrimEnd('/')}/{child.Uri.TrimStart('/')}");
-              if (fileInfo != null)
-              {
-                files.Add(new ArtifactoryFile
-                {
-                  Name = Path.GetFileName(child.Uri.TrimStart('/')),
-                  Path = child.Uri.TrimStart('/'),
-                  Size = fileInfo.Size / (1024.0 * 1024.0), // Convertir en Mo
-                  LastModified = fileInfo.LastModified,
-                  Environment = environment
-                });
-              }
-            }
-          }
+          url = "https://" + url;
         }
 
-        // Trier par date de modification (du plus récent au plus ancien)
-        return files.OrderByDescending(f => f.LastModified).ToList();
+        await webView.EnsureCoreWebView2Async();
+        webView.Source = new Uri(url);
       }
-      catch (Exception exception)
+      catch (Exception ex)
       {
-        // En cas d'erreur, on retourne une liste vide et on log l'erreur
-        Console.WriteLine($"Erreur lors de la récupération des fichiers {environment}: {exception.Message}");
-        return new List<ArtifactoryFile>();
+        MessageBox.Show($"Impossible de charger l'URL : {ex.Message}",
+            "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
       }
     }
 
-    private async Task<ArtifactoryFileInfo> GetFileInfoAsync(string fileUrl)
+    private void BtnBack_Click(object sender, RoutedEventArgs e)
     {
-      try
+      if (webView.CanGoBack)
       {
-        string apiUrl = $"{fileUrl}?properties";
-        var response = await _httpClient.GetAsync(apiUrl);
-        response.EnsureSuccessStatusCode();
-
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonConvert.DeserializeObject<ArtifactoryFileInfoResponse>(content);
-
-        return new ArtifactoryFileInfo
-        {
-          Size = result?.DownloadCount > 0 ? result.Size : 0,
-          LastModified = result?.LastModified ?? DateTime.MinValue
-        };
+        webView.GoBack();
       }
-      catch
+    }
+
+    private void BtnForward_Click(object sender, RoutedEventArgs e)
+    {
+      if (webView.CanGoForward)
       {
-        return null;
+        webView.GoForward();
       }
+    }
+
+    private void BtnRefresh_Click(object sender, RoutedEventArgs e)
+    {
+      webView.Reload();
+    }
+
+    private void UpdateUI()
+    {
+      btnBack.IsEnabled = webView.CanGoBack;
+      btnForward.IsEnabled = webView.CanGoForward;
+      btnGo.IsEnabled = !_isNavigating;
+      btnRefresh.IsEnabled = !_isNavigating;
     }
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
-      // Sauvegarder l'URL
-      Properties.Settings.Default.ArtifactoryUrl = txtArtifactoryUrl.Text.Trim();
-
       // Sauvegarder la taille et la position de la fenêtre
       if (WindowState == WindowState.Normal)
       {
@@ -193,7 +173,6 @@ namespace ArtifactoryBrowser
       }
       else
       {
-        // Si la fenêtre est maximisée ou minimisée, sauvegarder les valeurs restaurées
         var r = RestoreBounds;
         Properties.Settings.Default.WindowTop = r.Top;
         Properties.Settings.Default.WindowLeft = r.Left;
@@ -202,9 +181,44 @@ namespace ArtifactoryBrowser
       }
 
       Properties.Settings.Default.WindowState = WindowState;
-
-      // Sauvegarder tous les paramètres
       Properties.Settings.Default.Save();
+    }
+
+    private async void InitializeWebView()
+    {
+      try
+      {
+        // Créer un dossier pour les données utilisateur de WebView2
+        var userDataFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ArtifactoryBrowser",
+            "WebView2"
+        );
+
+        // Configurer l'environnement WebView2
+        var webView2Environment = await CoreWebView2Environment.CreateAsync(
+            userDataFolder: userDataFolder
+        );
+
+        // Initialiser le contrôle WebView2
+        await webView.EnsureCoreWebView2Async(webView2Environment);
+
+        // Configurer des paramètres supplémentaires
+        webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
+        webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+
+        // Charger l'URL sauvegardée ou l'URL par défaut
+        if (!string.IsNullOrEmpty(Properties.Settings.Default.LastUrl))
+        {
+          webView.Source = new Uri(Properties.Settings.Default.LastUrl);
+          txtArtifactoryUrl.Text = Properties.Settings.Default.LastUrl;
+        }
+      }
+      catch (Exception ex)
+      {
+        MessageBox.Show($"Erreur lors de l'initialisation de WebView2 : {ex.Message}",
+            "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+      }
     }
   }
 }
