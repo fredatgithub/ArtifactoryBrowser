@@ -19,24 +19,22 @@ namespace ArtifactoryBrowser
     {
       InitializeComponent();
       _httpClient = new HttpClient();
-      
+
       // Restaurer l'URL sauvegardée
       txtArtifactoryUrl.Text = Properties.Settings.Default.ArtifactoryUrl ?? string.Empty;
-      
+
       // Restaurer la taille et la position de la fenêtre
-      this.Left = Properties.Settings.Default.WindowLeft;
-      this.Top = Properties.Settings.Default.WindowTop;
-      this.Width = Properties.Settings.Default.WindowWidth;
-      this.Height = Properties.Settings.Default.WindowHeight;
-      this.WindowState = Properties.Settings.Default.WindowState;
-      
+      Left = Properties.Settings.Default.WindowLeft;
+      Top = Properties.Settings.Default.WindowTop;
+      Width = Properties.Settings.Default.WindowWidth;
+      Height = Properties.Settings.Default.WindowHeight;
+      WindowState = Properties.Settings.Default.WindowState;
+
       // S'assurer que la fenêtre est visible sur l'écran
-      if (this.Left < 0 || this.Top < 0 || 
-          this.Left > SystemParameters.VirtualScreenWidth || 
-          this.Top > SystemParameters.VirtualScreenHeight)
+      if (Left < 0 || Top < 0 || Left > SystemParameters.VirtualScreenWidth || Top > SystemParameters.VirtualScreenHeight)
       {
-        this.Left = 100;
-        this.Top = 100;
+        Left = 100;
+        Top = 100;
       }
     }
 
@@ -59,8 +57,7 @@ namespace ArtifactoryBrowser
 
       if (string.IsNullOrEmpty(baseUrl))
       {
-        MessageBox.Show("Veuillez entrer une URL Artifactory valide.", "Erreur",
-            MessageBoxButton.OK, MessageBoxImage.Error);
+        MessageBox.Show("Veuillez entrer une URL Artifactory valide.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
         return;
       }
 
@@ -76,8 +73,8 @@ namespace ArtifactoryBrowser
         }
 
         // Créer les URLs pour les environnements
-        string devUrl = new Uri(new Uri(baseUrl), "dev/").ToString();
-        string prodUrl = new Uri(new Uri(baseUrl), "prod/").ToString();
+        string devUrl = new Uri(baseUrl).ToString();
+        string prodUrl = devUrl.Replace("dev", "prod").ToString();
 
         // Récupérer les fichiers en parallèle
         var devTask = GetArtifactoryFilesAsync(devUrl, "DEV");
@@ -91,9 +88,9 @@ namespace ArtifactoryBrowser
 
         lblStatus.Text = $"Terminé. {devTask.Result.Count} fichiers DEV, {prodTask.Result.Count} fichiers PROD trouvés.";
       }
-      catch (Exception ex)
+      catch (Exception exception)
       {
-        MessageBox.Show($"Une erreur est survenue : {ex.Message}", "Erreur",
+        MessageBox.Show($"Une erreur est survenue : {exception.Message}", "Erreur",
             MessageBoxButton.OK, MessageBoxImage.Error);
         lblStatus.Text = "Erreur lors de la recherche.";
       }
@@ -114,8 +111,7 @@ namespace ArtifactoryBrowser
 
         // Ajouter le header pour accepter JSON
         _httpClient.DefaultRequestHeaders.Accept.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(
-            new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+        _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
 
         // Effectuer la requête
         var response = await _httpClient.GetAsync(apiUrl);
@@ -151,10 +147,10 @@ namespace ArtifactoryBrowser
         // Trier par date de modification (du plus récent au plus ancien)
         return files.OrderByDescending(f => f.LastModified).ToList();
       }
-      catch (Exception ex)
+      catch (Exception exception)
       {
         // En cas d'erreur, on retourne une liste vide et on log l'erreur
-        Console.WriteLine($"Erreur lors de la récupération des fichiers {environment}: {ex.Message}");
+        Console.WriteLine($"Erreur lors de la récupération des fichiers {environment}: {exception.Message}");
         return new List<ArtifactoryFile>();
       }
     }
@@ -186,27 +182,27 @@ namespace ArtifactoryBrowser
     {
       // Sauvegarder l'URL
       Properties.Settings.Default.ArtifactoryUrl = txtArtifactoryUrl.Text.Trim();
-      
+
       // Sauvegarder la taille et la position de la fenêtre
-      if (this.WindowState == WindowState.Normal)
+      if (WindowState == WindowState.Normal)
       {
-        Properties.Settings.Default.WindowTop = this.Top;
-        Properties.Settings.Default.WindowLeft = this.Left;
-        Properties.Settings.Default.WindowHeight = this.Height;
-        Properties.Settings.Default.WindowWidth = this.Width;
+        Properties.Settings.Default.WindowTop = Top;
+        Properties.Settings.Default.WindowLeft = Left;
+        Properties.Settings.Default.WindowHeight = Height;
+        Properties.Settings.Default.WindowWidth = Width;
       }
       else
       {
         // Si la fenêtre est maximisée ou minimisée, sauvegarder les valeurs restaurées
-        var r = this.RestoreBounds;
+        var r = RestoreBounds;
         Properties.Settings.Default.WindowTop = r.Top;
         Properties.Settings.Default.WindowLeft = r.Left;
         Properties.Settings.Default.WindowHeight = r.Height;
         Properties.Settings.Default.WindowWidth = r.Width;
       }
-      
-      Properties.Settings.Default.WindowState = this.WindowState;
-      
+
+      Properties.Settings.Default.WindowState = WindowState;
+
       // Sauvegarder tous les paramètres
       Properties.Settings.Default.Save();
     }
