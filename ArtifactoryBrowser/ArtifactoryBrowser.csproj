@@ -111,7 +111,11 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Models\ArtifactoryChild.cs" />
     <Compile Include="Models\ArtifactoryFile.cs" />
+    <Compile Include="Models\ArtifactoryFileInfo.cs" />
+    <Compile Include="Models\ArtifactoryFileInfoResponse.cs" />
+    <Compile Include="Models\ArtifactoryResponse.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
