@@ -59,7 +59,10 @@
     </GroupBox>
 
     <TextBlock x:Name="lblStatus" Grid.Row="4" Margin="0,5,0,0" FontSize="24"
-                   Text="           Entrez une URL Artifactory et cliquez sur Rechercher" 
-                   VerticalAlignment="Center" Foreground="Gray"/>
+               Text="Entrez une URL Artifactory et cliquez sur Rechercher" 
+               VerticalAlignment="Center" 
+               HorizontalAlignment="Center"
+               TextAlignment="Center"
+               Foreground="Gray"/>
   </Grid>
 </Window>
