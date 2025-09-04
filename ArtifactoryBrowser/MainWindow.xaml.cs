@@ -19,6 +19,9 @@ namespace ArtifactoryBrowser
     {
       InitializeComponent();
       _httpClient = new HttpClient();
+      
+      // Restaurer l'URL sauvegardée
+      txtArtifactoryUrl.Text = Properties.Settings.Default.ArtifactoryUrl ?? string.Empty;
     }
 
     private async void BtnSearch_Click(object sender, RoutedEventArgs e)
@@ -161,6 +164,13 @@ namespace ArtifactoryBrowser
       {
         return null;
       }
+    }
+
+    private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+      // Sauvegarder l'URL actuelle
+      Properties.Settings.Default.ArtifactoryUrl = txtArtifactoryUrl.Text.Trim();
+      Properties.Settings.Default.Save();
     }
   }
 }
