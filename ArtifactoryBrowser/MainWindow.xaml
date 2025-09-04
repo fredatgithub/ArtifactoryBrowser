@@ -5,8 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ArtifactoryBrowser"
         mc:Ignorable="d"
-        Title="Artifactory Browser" Height="600" Width="1000"
-                Closing="Window_Closing">
+        Title="Artifactory Browser" 
+        MinWidth="800" MinHeight="600"
+        WindowStartupLocation="Manual"
+        Closing="Window_Closing">
   <Grid Margin="10">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>

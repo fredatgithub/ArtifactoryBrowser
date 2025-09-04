@@ -22,6 +22,22 @@ namespace ArtifactoryBrowser
       
       // Restaurer l'URL sauvegardée
       txtArtifactoryUrl.Text = Properties.Settings.Default.ArtifactoryUrl ?? string.Empty;
+      
+      // Restaurer la taille et la position de la fenêtre
+      this.Left = Properties.Settings.Default.WindowLeft;
+      this.Top = Properties.Settings.Default.WindowTop;
+      this.Width = Properties.Settings.Default.WindowWidth;
+      this.Height = Properties.Settings.Default.WindowHeight;
+      this.WindowState = Properties.Settings.Default.WindowState;
+      
+      // S'assurer que la fenêtre est visible sur l'écran
+      if (this.Left < 0 || this.Top < 0 || 
+          this.Left > SystemParameters.VirtualScreenWidth || 
+          this.Top > SystemParameters.VirtualScreenHeight)
+      {
+        this.Left = 100;
+        this.Top = 100;
+      }
     }
 
     private async void BtnSearch_Click(object sender, RoutedEventArgs e)
@@ -168,8 +184,30 @@ namespace ArtifactoryBrowser
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
-      // Sauvegarder l'URL actuelle
+      // Sauvegarder l'URL
       Properties.Settings.Default.ArtifactoryUrl = txtArtifactoryUrl.Text.Trim();
+      
+      // Sauvegarder la taille et la position de la fenêtre
+      if (this.WindowState == WindowState.Normal)
+      {
+        Properties.Settings.Default.WindowTop = this.Top;
+        Properties.Settings.Default.WindowLeft = this.Left;
+        Properties.Settings.Default.WindowHeight = this.Height;
+        Properties.Settings.Default.WindowWidth = this.Width;
+      }
+      else
+      {
+        // Si la fenêtre est maximisée ou minimisée, sauvegarder les valeurs restaurées
+        var r = this.RestoreBounds;
+        Properties.Settings.Default.WindowTop = r.Top;
+        Properties.Settings.Default.WindowLeft = r.Left;
+        Properties.Settings.Default.WindowHeight = r.Height;
+        Properties.Settings.Default.WindowWidth = r.Width;
+      }
+      
+      Properties.Settings.Default.WindowState = this.WindowState;
+      
+      // Sauvegarder tous les paramètres
       Properties.Settings.Default.Save();
     }
   }
